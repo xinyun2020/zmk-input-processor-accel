@@ -46,9 +46,9 @@ manifest:
 };
 
 &inertial {
-    decay-rate = <88>;
-    min-velocity = <40>;
-    tick-ms = <12>;
+    decay-rate = <88>;    // smooth decay
+    min-velocity = <40>;  // coast until slow
+    tick-ms = <12>;       // ~83fps
     lift-timeout-ms = <35>;
 };
 

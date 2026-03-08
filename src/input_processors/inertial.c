@@ -14,6 +14,8 @@
 #include <zephyr/device.h>
 #include <zephyr/input/input.h>
 #include <drivers/input_processor.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
 #include <zephyr/logging/log.h>
 #include <stdlib.h>
 
