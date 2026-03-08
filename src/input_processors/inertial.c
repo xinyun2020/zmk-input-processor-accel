@@ -34,6 +34,7 @@ struct inertial_state {
     int32_t remainder_x;
     int32_t remainder_y;
     bool coasting;
+    bool injecting;  // Flag to ignore our own injected events
     struct k_work_delayable coast_work;
     const struct device *dev;           // Our processor device
     const struct device *input_dev;     // Original input device (trackpad)
@@ -84,6 +85,9 @@ static void coast_work_handler(struct k_work *work) {
     state->remainder_y = move_y % 100;
 
     if ((dx != 0 || dy != 0) && state->input_dev != NULL) {
+        // Set flag to ignore our own injected events
+        state->injecting = true;
+
         // Inject synthetic events back through the input pipeline
         // Use sync=true on last event to trigger report
         if (dx != 0 && dy != 0) {
@@ -94,6 +98,8 @@ static void coast_work_handler(struct k_work *work) {
         } else {
             input_report_rel(state->input_dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
         }
+
+        state->injecting = false;
 
         LOG_DBG("Inertial: coast dx=%d dy=%d vel_x=%d vel_y=%d",
                 dx, dy, state->velocity_x, state->velocity_y);
@@ -117,6 +123,11 @@ static int inertial_handle_event(const struct device *dev,
     }
 
     if (event->code != INPUT_REL_X && event->code != INPUT_REL_Y) {
+        return ZMK_INPUT_PROC_CONTINUE;
+    }
+
+    // Ignore our own injected events to prevent feedback loop
+    if (proc_state->injecting) {
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
@@ -162,6 +173,7 @@ static int inertial_init(const struct device *dev) {
     state->dev = dev;
     state->input_dev = NULL;  // Will be captured from first event
     state->coasting = false;
+    state->injecting = false;
     state->velocity_x = 0;
     state->velocity_y = 0;
     state->remainder_x = 0;
