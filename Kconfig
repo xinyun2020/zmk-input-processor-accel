@@ -1,0 +1,8 @@
+config ZMK_INPUT_PROCESSOR_SIGMOID_ACCEL
+    bool "Enable sigmoid acceleration input processor"
+    default y
+    depends on ZMK_POINTING
+    help
+      Enable a custom input processor that applies Steam Deck-style
+      sigmoid acceleration to trackpad/mouse movement. Slow movements
+      remain precise, fast movements are amplified.

@@ -1,0 +1,45 @@
+/*
+ * Sigmoid Acceleration Input Processor
+ *
+ * Include this file to get a pre-configured sigmoid acceleration processor.
+ * Then add &sigmoid_accel to your input-processors chain.
+ *
+ * Example usage in your keymap/config:
+ *
+ *   #include <behaviors/input_processor_sigmoid_accel.dtsi>
+ *
+ *   &glidepoint_listener {
+ *       input-processors = <&sigmoid_accel>, <&zip_xy_transform ...>, ...;
+ *   };
+ *
+ * To customize the acceleration curve, override the properties:
+ *
+ *   &sigmoid_accel {
+ *       min-scale = <100>;   // 1.0x at slow speeds
+ *       max-scale = <400>;   // 4.0x at fast speeds
+ *       threshold = <30>;    // lower = acceleration kicks in earlier
+ *       steepness = <15>;    // higher = sharper transition
+ *   };
+ */
+
+/ {
+    input_processors {
+        compatible = "zmk,input-processors";
+
+        sigmoid_accel: sigmoid_accel {
+            compatible = "zmk,input-processor-sigmoid-accel";
+            #input-processor-cells = <0>;
+
+            /*
+             * Default Steam Deck-like acceleration curve:
+             * - Slow movements: 1.0x (precise)
+             * - Fast movements: 3.0x (amplified)
+             * - Smooth transition around velocity 50
+             */
+            min-scale = <100>;    // 1.0x minimum scale
+            max-scale = <300>;    // 3.0x maximum scale
+            threshold = <50>;     // velocity threshold
+            steepness = <10>;     // gradual curve (0.1)
+        };
+    };
+};
