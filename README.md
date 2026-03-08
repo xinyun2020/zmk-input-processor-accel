@@ -8,9 +8,18 @@ Apple Magic Trackpad-style acceleration for ZMK keyboards.
 
 ## The Fix
 
-- **Slow** → ~1x (precise)
+- **Slow** → ~1x (precise, jitter-free)
 - **Fast** → ~5x (covers screen)
-- **Smooth transition** → sigmoid curve ramps gradually, cursor speed matches your expectation
+- **Smooth transition** → true sigmoid curve, not linear approximation
+
+## Features
+
+Based on research from HCI literature and production implementations:
+
+- **True sigmoid curve** - Lookup table with interpolation, matches the characteristic S-curve
+- **Combined XY velocity** - Uses motion vector magnitude for consistent diagonal behavior
+- **Velocity averaging** - Smooths across 4 samples to prevent erratic acceleration changes
+- **1 Euro filter** - Adaptive low-pass filter reduces jitter at slow speeds without adding lag
 
 ## Installation
 
@@ -63,6 +72,16 @@ Scale                               Fixed: ════════════�
 1x|← precision
   +--------------------------------> Velocity
 ```
+
+## Research
+
+Implementation informed by:
+
+- **1 Euro Filter** - Casiez, Roussel, Vogel (CHI 2012) - Adaptive low-pass filtering that reduces jitter without adding lag. Used in Chrome, Unreal Engine, and major input systems. [gery.casiez.net/1euro](https://gery.casiez.net/1euro/)
+
+- **libinput pointer acceleration** - Freedesktop's reference implementation for Linux. Documents velocity calculation, tracker systems, and device-specific tuning. [wayland.freedesktop.org/libinput](https://wayland.freedesktop.org/libinput/doc/latest/pointer-acceleration.html)
+
+- **Transfer functions for pointing** - Casiez, Vogel (CHI 2008) - Foundational research on pointer acceleration curves and user performance
 
 ## License
 
