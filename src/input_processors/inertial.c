@@ -12,10 +12,9 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
+#include <zephyr/input/input.h>
 #include <drivers/input_processor.h>
 #include <zephyr/logging/log.h>
-#include <zmk/endpoints.h>
-#include <zmk/hid.h>
 #include <stdlib.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
