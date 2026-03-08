@@ -27,7 +27,6 @@ properties:
 
   track-remainders:
     type: boolean
-    default: true
     description: |
       Whether this processor tracks sub-pixel remainders internally.
       Set to true since sigmoid_accel handles its own remainder tracking.
