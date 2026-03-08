@@ -19,10 +19,10 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-#define VELOCITY_HISTORY_SIZE 4
 #define ONE_EURO_MINCUTOFF 1000  // 1.0 Hz
 #define ONE_EURO_BETA 100       // 0.1
 #define ONE_EURO_DCUTOFF 1000   // 1.0 Hz
+#define TAU_FACTOR 159155       // 1e6 / (2 * PI), for microsecond calculations
 
 struct sigmoid_accel_config {
     int32_t min_scale;
@@ -37,14 +37,12 @@ struct sigmoid_accel_state {
     bool has_x;
     bool has_y;
     int64_t last_time_us;
-    int32_t velocity_history[VELOCITY_HISTORY_SIZE];
-    int velocity_index;
-    int velocity_count;
+    int32_t avg_velocity;
     int32_t filtered_x;
     int32_t filtered_y;
     int32_t dx_filtered;
     int32_t dy_filtered;
-    bool filter_initialized;
+    bool initialized;
     int32_t remainder_x;
     int32_t remainder_y;
 };
@@ -82,53 +80,40 @@ static int32_t isqrt(int32_t n) {
     return x;
 }
 
-// tau = 1/(2*pi*fc), alpha = dt/(dt+tau)
 static int32_t calc_alpha(int32_t cutoff_hz_x1000, int32_t dt_us) {
     if (dt_us <= 0) dt_us = 1000;
+    if (cutoff_hz_x1000 <= 0) cutoff_hz_x1000 = 1000;
 
-    int32_t tau_us = 159155000 / cutoff_hz_x1000;
+    int32_t tau_us = TAU_FACTOR * 1000 / cutoff_hz_x1000;
     int32_t alpha = dt_us * 1000 / (dt_us + tau_us);
 
-    if (alpha < 10) alpha = 10;
-    if (alpha > 990) alpha = 990;
+    if (alpha < 10) return 10;
+    if (alpha > 990) return 990;
     return alpha;
 }
 
-static int32_t one_euro_filter(int32_t x, int32_t *x_filtered, int32_t *dx_filtered,
+static int32_t one_euro_filter(int32_t x, int32_t *x_filt, int32_t *dx_filt,
                                int32_t dt_us) {
-    int32_t dx = (x - *x_filtered) * 1000;
+    int32_t dx = (x * 1000 - *x_filt);
     if (dt_us > 0) {
         dx = dx * 1000 / dt_us;
     }
 
     int32_t alpha_d = calc_alpha(ONE_EURO_DCUTOFF, dt_us);
-    *dx_filtered = (*dx_filtered * (1000 - alpha_d) + dx * alpha_d) / 1000;
+    *dx_filt = (*dx_filt * (1000 - alpha_d) + dx * alpha_d) / 1000;
 
-    // Adaptive: faster movement = less smoothing
-    int32_t cutoff = ONE_EURO_MINCUTOFF + ONE_EURO_BETA * abs(*dx_filtered) / 1000;
+    int32_t cutoff = ONE_EURO_MINCUTOFF + ONE_EURO_BETA * abs(*dx_filt) / 1000;
     if (cutoff > 50000) cutoff = 50000;
 
     int32_t alpha = calc_alpha(cutoff, dt_us);
-    *x_filtered = (*x_filtered * (1000 - alpha) + x * 1000 * alpha / 1000) / 1000;
-    return *x_filtered;
+    *x_filt = (*x_filt * (1000 - alpha) + x * 1000 * alpha) / 1000;
+    return *x_filt;
 }
 
-static int32_t add_velocity(struct sigmoid_accel_state *state, int32_t velocity) {
-    state->velocity_history[state->velocity_index] = velocity;
-    state->velocity_index = (state->velocity_index + 1) % VELOCITY_HISTORY_SIZE;
-    if (state->velocity_count < VELOCITY_HISTORY_SIZE) {
-        state->velocity_count++;
-    }
-
-    // Weighted average: recent samples matter more
-    int32_t sum = 0;
-    int32_t weight_sum = 0;
-    for (int i = 0; i < state->velocity_count; i++) {
-        int weight = i + 1;
-        sum += state->velocity_history[i] * weight;
-        weight_sum += weight;
-    }
-    return weight_sum > 0 ? sum / weight_sum : velocity;
+// Exponential moving average for velocity smoothing
+static int32_t smooth_velocity(int32_t current, int32_t new_val) {
+    // alpha = 0.4 (400/1000) - responsive but smooth
+    return (current * 600 + new_val * 400) / 1000;
 }
 
 static int32_t calculate_scale(const struct sigmoid_accel_config *config,
@@ -138,6 +123,19 @@ static int32_t calculate_scale(const struct sigmoid_accel_config *config,
     int32_t sigmoid_val = sigmoid_lookup(sigmoid_input);
     return config->min_scale +
            (config->max_scale - config->min_scale) * sigmoid_val / 100;
+}
+
+static void reset_state(struct sigmoid_accel_state *s) {
+    s->avg_velocity = 0;
+    s->filtered_x = 0;
+    s->filtered_y = 0;
+    s->dx_filtered = 0;
+    s->dy_filtered = 0;
+    s->remainder_x = 0;
+    s->remainder_y = 0;
+    s->has_x = false;
+    s->has_y = false;
+    s->initialized = false;
 }
 
 static int sigmoid_accel_handle_event(const struct device *dev,
@@ -157,11 +155,13 @@ static int sigmoid_accel_handle_event(const struct device *dev,
 
     int64_t now_us = k_ticks_to_us_floor64(k_uptime_ticks());
     int64_t dt_us = now_us - s->last_time_us;
+
+    // Reset state after long gap (finger lifted)
     if (dt_us <= 0 || dt_us > 100000) {
-        dt_us = 8000;  // ~125Hz default
+        reset_state(s);
+        dt_us = 8000;
     }
 
-    // X and Y events arrive separately, accumulate both
     if (event->code == INPUT_REL_X) {
         s->pending_x = event->value;
         s->has_x = true;
@@ -174,23 +174,23 @@ static int sigmoid_accel_handle_event(const struct device *dev,
     int32_t dy = s->has_y ? s->pending_y : 0;
     int32_t magnitude = isqrt(dx * dx + dy * dy);
     int32_t instant_velocity = magnitude * 10000 / (int32_t)dt_us;
-    int32_t avg_velocity = add_velocity(s, instant_velocity);
-    int32_t scale = calculate_scale(config, avg_velocity);
 
-    if (!s->filter_initialized) {
+    if (!s->initialized) {
+        s->avg_velocity = instant_velocity;
         s->filtered_x = event->value * 1000;
         s->filtered_y = event->value * 1000;
-        s->dx_filtered = 0;
-        s->dy_filtered = 0;
-        s->filter_initialized = true;
+        s->initialized = true;
     }
+
+    s->avg_velocity = smooth_velocity(s->avg_velocity, instant_velocity);
+    int32_t scale = calculate_scale(config, s->avg_velocity);
 
     int32_t filtered_value;
     int32_t *remainder;
     bool is_x = (event->code == INPUT_REL_X);
 
-    // Only filter at slow speeds to reduce jitter
-    if (avg_velocity < config->threshold / 2) {
+    // Apply jitter filter only at slow speeds
+    if (s->avg_velocity < config->threshold / 2) {
         if (is_x) {
             filtered_value = one_euro_filter(event->value, &s->filtered_x,
                                              &s->dx_filtered, dt_us) / 1000;
@@ -221,7 +221,7 @@ static int sigmoid_accel_handle_event(const struct device *dev,
     }
 
     LOG_DBG("v=%d scale=%d.%02d in=%d out=%d",
-            avg_velocity, scale / 100, scale % 100,
+            s->avg_velocity, scale / 100, scale % 100,
             filtered_value, event->value);
 
     return ZMK_INPUT_PROC_CONTINUE;
