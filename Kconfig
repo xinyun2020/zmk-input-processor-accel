@@ -11,7 +11,7 @@ config ZMK_INPUT_PROCESSOR_INERTIAL
     bool "Enable inertial scrolling input processor"
     default y
     depends on ZMK_POINTING
-    depends on ZMK_MOUSE
+    select ZMK_MOUSE
     help
       Enable momentum/coasting effect after finger lift. Cursor continues
       moving with velocity decay, like Apple Magic Trackpad or Steam Deck.
