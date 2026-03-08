@@ -1,23 +1,6 @@
 # ZMK Input Processor Accel
 
-Apple Magic Trackpad-style acceleration for ZMK keyboards.
-
-## The Problem
-
-[`zip_xy_scaler 5 1`](https://zmk.dev/docs/keymaps/input-processors/scaler) = always 5x. Jittery precision or sluggish swipes - pick one.
-
-## The Fix
-
-- **Slow** → ~1x (precise, jitter-free)
-- **Fast** → ~5x (covers screen)
-- **Smooth transition** → true sigmoid curve
-
-## Features
-
-- **Sigmoid curve** - Lookup table with interpolation
-- **Combined XY velocity** - Consistent diagonal behavior
-- **Velocity smoothing** - EMA prevents erratic acceleration
-- **1 Euro filter** - Reduces jitter at slow speeds without lag
+A [ZMK input processor](https://zmk.dev/docs/keymaps/input-processors) that brings Apple Magic Trackpad-style acceleration to keyboards with trackpads like the [Cirque Pinnacle](https://zmk.dev/docs/features/pointers). Unlike the built-in [`zip_xy_scaler`](https://zmk.dev/docs/keymaps/input-processors/scaler) which applies a fixed multiplier, this module uses a [sigmoid curve](https://en.wikipedia.org/wiki/Sigmoid_function) that adapts to your movement speed: slow movements stay precise (~1x) for pixel-perfect targeting, fast swipes are amplified (~5x) for crossing the screen. The implementation uses a [1 Euro Filter](https://gery.casiez.net/1euro/) for jitter reduction at slow speeds without adding lag, and follows velocity calculation principles from [libinput](https://wayland.freedesktop.org/libinput/doc/latest/pointer-acceleration.html).
 
 ## Installation
 
@@ -34,16 +17,16 @@ manifest:
       revision: main
 ```
 
-## Usage
+## Configuration
 
 ```c
 #include <behaviors/input_processor_sigmoid_accel.dtsi>
 
 &sigmoid_accel {
-    min-scale = <50>;     // 0.5x slow
-    max-scale = <400>;    // 4.0x fast
-    threshold = <35>;
-    steepness = <20>;
+    min-scale = <50>;     // 0.5x at slow speeds
+    max-scale = <400>;    // 4.0x at fast speeds
+    threshold = <35>;     // velocity where curve centers
+    steepness = <20>;     // transition sharpness
 };
 
 &glidepoint_listener {
@@ -51,27 +34,28 @@ manifest:
 };
 ```
 
-## How It Feels
+| Parameter | Description |
+|-----------|-------------|
+| `min-scale` | Scale at slow speeds (/100, so 50 = 0.5x) |
+| `max-scale` | Scale at fast speeds (/100, so 400 = 4.0x) |
+| `threshold` | Velocity midpoint - lower = earlier acceleration |
+| `steepness` | Curve sharpness - higher = more abrupt transition |
 
-```
-Scale
-  ^
-5x|                    ___________  fast swipes
-  |                 __/
-4x|              __/
-  |           __/
-3x|        __/    sigmoid curve
-  |     __/
-2x|  __/
-  |_/
-1x| precision
-  +--------------------------------> Velocity
-```
+## How It Works
 
-## Research
+The sigmoid curve maps velocity to scale factor:
 
-- [1 Euro Filter](https://gery.casiez.net/1euro/) - Casiez et al., CHI 2012
-- [libinput acceleration](https://wayland.freedesktop.org/libinput/doc/latest/pointer-acceleration.html) - Freedesktop
+![Sigmoid curve](https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Logistic-curve.svg/320px-Logistic-curve.svg.png)
+
+*Slow movements (left) stay near minimum scale, fast movements (right) reach maximum scale.*
+
+Jitter is reduced using the 1 Euro Filter adaptive low-pass algorithm:
+
+![1 Euro Filter](https://gery.casiez.net/1euro/1euroAlgorithm.png)
+
+*Cutoff frequency adapts to speed - low cutoff smooths slow movements, high cutoff preserves fast movements.*
+
+Reference: [libinput touchpad acceleration curve](https://wayland.freedesktop.org/libinput/doc/latest/_images/ptraccel-touchpad.svg)
 
 ## License
 
