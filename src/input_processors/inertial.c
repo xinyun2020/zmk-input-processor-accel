@@ -31,10 +31,10 @@ struct inertial_state {
     int32_t velocity_x;
     int32_t velocity_y;
     int64_t last_input_time;
+    int64_t last_inject_time;  // Track when we last injected events
     int32_t remainder_x;
     int32_t remainder_y;
     bool coasting;
-    bool injecting;  // Flag to ignore our own injected events
     struct k_work_delayable coast_work;
     const struct device *dev;           // Our processor device
     const struct device *input_dev;     // Original input device (trackpad)
@@ -85,8 +85,8 @@ static void coast_work_handler(struct k_work *work) {
     state->remainder_y = move_y % 100;
 
     if ((dx != 0 || dy != 0) && state->input_dev != NULL) {
-        // Set flag to ignore our own injected events
-        state->injecting = true;
+        // Record injection time to ignore these events in handler
+        state->last_inject_time = k_uptime_get();
 
         // Inject synthetic events back through the input pipeline
         // Use sync=true on last event to trigger report
@@ -98,8 +98,6 @@ static void coast_work_handler(struct k_work *work) {
         } else {
             input_report_rel(state->input_dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
         }
-
-        state->injecting = false;
 
         LOG_DBG("Inertial: coast dx=%d dy=%d vel_x=%d vel_y=%d",
                 dx, dy, state->velocity_x, state->velocity_y);
@@ -126,12 +124,13 @@ static int inertial_handle_event(const struct device *dev,
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    // Ignore our own injected events to prevent feedback loop
-    if (proc_state->injecting) {
+    int64_t now = k_uptime_get();
+
+    // Ignore events that arrive shortly after we injected (likely our own)
+    // This prevents the feedback loop where injected events restart coasting
+    if (proc_state->coasting && (now - proc_state->last_inject_time) < 50) {
         return ZMK_INPUT_PROC_CONTINUE;
     }
-
-    int64_t now = k_uptime_get();
 
     // Capture the input device for later synthetic event injection
     if (event->dev != NULL) {
@@ -173,12 +172,12 @@ static int inertial_init(const struct device *dev) {
     state->dev = dev;
     state->input_dev = NULL;  // Will be captured from first event
     state->coasting = false;
-    state->injecting = false;
     state->velocity_x = 0;
     state->velocity_y = 0;
     state->remainder_x = 0;
     state->remainder_y = 0;
     state->last_input_time = 0;
+    state->last_inject_time = 0;
     k_work_init_delayable(&state->coast_work, coast_work_handler);
     return 0;
 }
