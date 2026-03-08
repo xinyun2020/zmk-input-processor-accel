@@ -43,19 +43,17 @@ manifest:
 
 ## How It Works
 
-The sigmoid curve maps velocity to scale factor:
+The sigmoid curve maps velocity to scale factor, similar to how [libinput handles touchpad acceleration](https://wayland.freedesktop.org/libinput/doc/latest/pointer-acceleration.html):
 
-![Sigmoid curve](https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Logistic-curve.svg/320px-Logistic-curve.svg.png)
+![Pointer acceleration curve](https://wayland.freedesktop.org/libinput/doc/latest/_images/ptraccel-touchpad.svg)
 
-*Slow movements (left) stay near minimum scale, fast movements (right) reach maximum scale.*
+*Slow speeds (left) have lower acceleration, fast speeds (right) are amplified.*
 
 Jitter is reduced using the 1 Euro Filter adaptive low-pass algorithm:
 
 ![1 Euro Filter](https://gery.casiez.net/1euro/1euroAlgorithm.png)
 
 *Cutoff frequency adapts to speed - low cutoff smooths slow movements, high cutoff preserves fast movements.*
-
-Reference: [libinput touchpad acceleration curve](https://wayland.freedesktop.org/libinput/doc/latest/_images/ptraccel-touchpad.svg)
 
 ## License
 
