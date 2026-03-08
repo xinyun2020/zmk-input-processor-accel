@@ -13,9 +13,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/input/input.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <drivers/input_processor.h>
-#include <zmk/hid.h>
-#include <zmk/endpoints.h>
 #include <zephyr/logging/log.h>
 #include <stdlib.h>
 
@@ -36,14 +35,9 @@ struct inertial_state {
     int32_t remainder_y;
     bool coasting;
     struct k_work_delayable coast_work;
-    const struct device *dev;
+    const struct device *dev;           // Our processor device
+    const struct device *input_dev;     // Original input device (trackpad)
 };
-
-static void send_mouse_move(int16_t dx, int16_t dy) {
-    zmk_hid_mouse_movement_set(dx, dy);
-    zmk_endpoints_send_mouse_report();
-    zmk_hid_mouse_movement_set(0, 0);
-}
 
 static void coast_work_handler(struct k_work *work) {
     struct k_work_delayable *dwork = k_work_delayable_from_work(work);
@@ -89,8 +83,17 @@ static void coast_work_handler(struct k_work *work) {
     state->remainder_x = move_x % 100;
     state->remainder_y = move_y % 100;
 
-    if (dx != 0 || dy != 0) {
-        send_mouse_move(dx, dy);
+    if ((dx != 0 || dy != 0) && state->input_dev != NULL) {
+        // Inject synthetic events back through the input pipeline
+        if (dx != 0) {
+            input_report_rel(state->input_dev, INPUT_REL_X, dx, false, K_NO_WAIT);
+        }
+        if (dy != 0) {
+            input_report_rel(state->input_dev, INPUT_REL_Y, dy, false, K_NO_WAIT);
+        }
+        // Send sync event to trigger report
+        input_report(state->input_dev, INPUT_EV_SYN, INPUT_SYN_REPORT, 0, true, K_NO_WAIT);
+
         LOG_DBG("Inertial: coast dx=%d dy=%d vel_x=%d vel_y=%d",
                 dx, dy, state->velocity_x, state->velocity_y);
     }
@@ -117,6 +120,11 @@ static int inertial_handle_event(const struct device *dev,
     }
 
     int64_t now = k_uptime_get();
+
+    // Capture the input device for later synthetic event injection
+    if (event->dev != NULL) {
+        proc_state->input_dev = event->dev;
+    }
 
     // If we were coasting, stop - finger is back
     if (proc_state->coasting) {
@@ -151,6 +159,7 @@ static int inertial_handle_event(const struct device *dev,
 static int inertial_init(const struct device *dev) {
     struct inertial_state *state = dev->data;
     state->dev = dev;
+    state->input_dev = NULL;  // Will be captured from first event
     state->coasting = false;
     state->velocity_x = 0;
     state->velocity_y = 0;
