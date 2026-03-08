@@ -215,7 +215,6 @@ static int sigmoid_accel_handle_event(const struct device *dev,
     case INPUT_REL_X:
         group = &s->pointer;
         axis = &group->primary;
-        group->secondary = s->pointer.secondary;
         is_scroll = false;
         break;
     case INPUT_REL_Y:
