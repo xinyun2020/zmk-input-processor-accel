@@ -10,16 +10,14 @@ Apple Magic Trackpad-style acceleration for ZMK keyboards.
 
 - **Slow** → ~1x (precise, jitter-free)
 - **Fast** → ~5x (covers screen)
-- **Smooth transition** → true sigmoid curve, not linear approximation
+- **Smooth transition** → true sigmoid curve
 
 ## Features
 
-Based on research from HCI literature and production implementations:
-
-- **True sigmoid curve** - Lookup table with interpolation, matches the characteristic S-curve
-- **Combined XY velocity** - Uses motion vector magnitude for consistent diagonal behavior
-- **Velocity averaging** - Smooths across 4 samples to prevent erratic acceleration changes
-- **1 Euro filter** - Adaptive low-pass filter reduces jitter at slow speeds without adding lag
+- **Sigmoid curve** - Lookup table with interpolation
+- **Combined XY velocity** - Consistent diagonal behavior
+- **Velocity smoothing** - EMA prevents erratic acceleration
+- **1 Euro filter** - Reduces jitter at slow speeds without lag
 
 ## Installation
 
@@ -49,39 +47,31 @@ manifest:
 };
 
 &glidepoint_listener {
-    input-processors =
-        <&sigmoid_accel>
-        , <&zip_xy_transform (...)>
-        , <&zip_xy_scaler 2 1>;
+    input-processors = <&sigmoid_accel>, <&zip_xy_scaler 2 1>;
 };
 ```
 
 ## How It Feels
 
 ```
-Scale                               Fixed: ════════════════════ (always 5x)
+Scale
   ^
-5x|                    ___________ ← fast swipes
+5x|                    ___________  fast swipes
   |                 __/
 4x|              __/
   |           __/
-3x|        __/    ← sigmoid curve
+3x|        __/    sigmoid curve
   |     __/
 2x|  __/
   |_/
-1x|← precision
+1x| precision
   +--------------------------------> Velocity
 ```
 
 ## Research
 
-Implementation informed by:
-
-- **1 Euro Filter** - Casiez, Roussel, Vogel (CHI 2012) - Adaptive low-pass filtering that reduces jitter without adding lag. Used in Chrome, Unreal Engine, and major input systems. [gery.casiez.net/1euro](https://gery.casiez.net/1euro/)
-
-- **libinput pointer acceleration** - Freedesktop's reference implementation for Linux. Documents velocity calculation, tracker systems, and device-specific tuning. [wayland.freedesktop.org/libinput](https://wayland.freedesktop.org/libinput/doc/latest/pointer-acceleration.html)
-
-- **Transfer functions for pointing** - Casiez, Vogel (CHI 2008) - Foundational research on pointer acceleration curves and user performance
+- [1 Euro Filter](https://gery.casiez.net/1euro/) - Casiez et al., CHI 2012
+- [libinput acceleration](https://wayland.freedesktop.org/libinput/doc/latest/pointer-acceleration.html) - Freedesktop
 
 ## License
 
