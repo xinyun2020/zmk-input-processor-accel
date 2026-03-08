@@ -15,7 +15,7 @@ Apple/Steam Deck-style trackpad feel for ZMK keyboards.
 ## Features
 
 - **Sigmoid acceleration**: 0.7x → 5x based on velocity
-- **Inertial scrolling**: Cursor slides after finger lift
+- **Inertial scrolling**: Cursor slides after finger lift *(coming soon)*
 
 ## Installation
 
@@ -36,7 +36,6 @@ manifest:
 
 ```c
 #include <behaviors/input_processor_sigmoid_accel.dtsi>
-#include <behaviors/input_processor_inertial.dtsi>
 
 &sigmoid_accel {
     min-scale = <70>;     // 0.7x slow
@@ -45,17 +44,9 @@ manifest:
     steepness = <25>;
 };
 
-&inertial {
-    decay-rate = <88>;    // smooth decay
-    min-velocity = <40>;  // coast until slow
-    tick-ms = <12>;       // ~83fps
-    lift-timeout-ms = <35>;
-};
-
 &glidepoint_listener {
     input-processors =
         <&sigmoid_accel>
-        , <&inertial>
         , <&zip_xy_transform (...)>
         , <&zip_xy_scaler 2 1>;
 };

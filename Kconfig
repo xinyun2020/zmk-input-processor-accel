@@ -7,11 +7,10 @@ config ZMK_INPUT_PROCESSOR_SIGMOID_ACCEL
       sigmoid acceleration to trackpad/mouse movement. Slow movements
       remain precise, fast movements are amplified.
 
-config ZMK_INPUT_PROCESSOR_INERTIAL
-    bool "Enable inertial scrolling input processor"
-    default y
-    depends on ZMK_POINTING
-    select ZMK_MOUSE
-    help
-      Enable momentum/coasting effect after finger lift. Cursor continues
-      moving with velocity decay, like Apple Magic Trackpad or Steam Deck.
+# Inertial scrolling disabled - requires rework to use input injection instead of HID calls
+# config ZMK_INPUT_PROCESSOR_INERTIAL
+#     bool "Enable inertial scrolling input processor"
+#     default n
+#     depends on ZMK_POINTING
+#     help
+#       Enable momentum/coasting effect after finger lift.
