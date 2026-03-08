@@ -85,14 +85,15 @@ static void coast_work_handler(struct k_work *work) {
 
     if ((dx != 0 || dy != 0) && state->input_dev != NULL) {
         // Inject synthetic events back through the input pipeline
-        if (dx != 0) {
+        // Use sync=true on last event to trigger report
+        if (dx != 0 && dy != 0) {
             input_report_rel(state->input_dev, INPUT_REL_X, dx, false, K_NO_WAIT);
+            input_report_rel(state->input_dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
+        } else if (dx != 0) {
+            input_report_rel(state->input_dev, INPUT_REL_X, dx, true, K_NO_WAIT);
+        } else {
+            input_report_rel(state->input_dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
         }
-        if (dy != 0) {
-            input_report_rel(state->input_dev, INPUT_REL_Y, dy, false, K_NO_WAIT);
-        }
-        // Send sync event to trigger report
-        input_report(state->input_dev, INPUT_EV_SYN, INPUT_SYN_REPORT, 0, true, K_NO_WAIT);
 
         LOG_DBG("Inertial: coast dx=%d dy=%d vel_x=%d vel_y=%d",
                 dx, dy, state->velocity_x, state->velocity_y);
