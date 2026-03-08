@@ -1,6 +1,6 @@
 # ZMK Input Processor Accel
 
-Apple/Steam Deck-style trackpad feel for ZMK keyboards.
+Apple Magic Trackpad-style acceleration for ZMK keyboards.
 
 ## The Problem
 
@@ -11,11 +11,6 @@ Apple/Steam Deck-style trackpad feel for ZMK keyboards.
 - **Slow** → ~1x (precise)
 - **Fast** → ~5x (covers screen)
 - **Smooth transition** → sigmoid curve ramps gradually, cursor speed matches your expectation
-
-## Features
-
-- **Sigmoid acceleration**: 0.7x → 5x based on velocity
-- **Inertial scrolling**: Cursor slides after finger lift
 
 ## Installation
 
@@ -36,26 +31,17 @@ manifest:
 
 ```c
 #include <behaviors/input_processor_sigmoid_accel.dtsi>
-#include <behaviors/input_processor_inertial.dtsi>
 
 &sigmoid_accel {
-    min-scale = <70>;     // 0.7x slow
-    max-scale = <500>;    // 5.0x fast
-    threshold = <25>;
-    steepness = <25>;
-};
-
-&inertial {
-    decay-rate = <88>;    // smooth decay
-    min-velocity = <40>;  // coast until slow
-    tick-ms = <12>;       // ~83fps
-    lift-timeout-ms = <35>;
+    min-scale = <50>;     // 0.5x slow
+    max-scale = <400>;    // 4.0x fast
+    threshold = <35>;
+    steepness = <20>;
 };
 
 &glidepoint_listener {
     input-processors =
         <&sigmoid_accel>
-        , <&inertial>
         , <&zip_xy_transform (...)>
         , <&zip_xy_scaler 2 1>;
 };
