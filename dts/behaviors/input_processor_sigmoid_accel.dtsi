@@ -29,6 +29,7 @@
         sigmoid_accel: sigmoid_accel {
             compatible = "zmk,input-processor-sigmoid-accel";
             #input-processor-cells = <0>;
+            track-remainders;     // processor handles its own remainder tracking
 
             /*
              * Default Steam Deck-like acceleration curve:
