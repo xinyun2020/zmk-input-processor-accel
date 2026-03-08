@@ -1,0 +1,56 @@
+description: |
+  Inertial scrolling input processor for momentum/coasting effect.
+  Cursor continues moving after finger lifts, with velocity decay.
+
+  Example:
+    &inertial {
+        compatible = "zmk,input-processor-inertial";
+        #input-processor-cells = <0>;
+        decay-rate = <85>;        // 85% velocity retained per tick
+        min-velocity = <50>;      // stop when velocity below this
+        tick-ms = <16>;           // ~60fps updates
+        lift-timeout-ms = <50>;   // detect finger lift after 50ms no input
+    };
+
+compatible: "zmk,input-processor-inertial"
+
+include: base.yaml
+
+properties:
+  "#input-processor-cells":
+    type: int
+    required: true
+    const: 0
+    description: Must be zero - no parameters at binding time
+
+  track-remainders:
+    type: boolean
+    description: Whether this processor tracks remainders internally.
+
+  decay-rate:
+    type: int
+    default: 85
+    description: |
+      Percentage of velocity retained each tick (0-100).
+      85 = smooth coast, 70 = quick stop, 95 = long glide.
+
+  min-velocity:
+    type: int
+    default: 50
+    description: |
+      Stop coasting when velocity drops below this threshold.
+      Higher = stops sooner, lower = coasts longer.
+
+  tick-ms:
+    type: int
+    default: 16
+    description: |
+      Milliseconds between inertial update ticks.
+      16 = ~60fps, 8 = ~120fps for smoother feel.
+
+  lift-timeout-ms:
+    type: int
+    default: 50
+    description: |
+      Time without input before detecting finger lift and starting coast.
+      Lower = more responsive, higher = less false triggers.

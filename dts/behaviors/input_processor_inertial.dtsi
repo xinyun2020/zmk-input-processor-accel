@@ -1,0 +1,46 @@
+/*
+ * Inertial Scrolling Input Processor
+ *
+ * Include this file to get momentum/coasting after finger lift.
+ * Add &inertial to your input-processors chain AFTER acceleration.
+ *
+ * Example usage:
+ *
+ *   #include <behaviors/input_processor_inertial.dtsi>
+ *
+ *   &glidepoint_listener {
+ *       input-processors = <&sigmoid_accel>, <&inertial>, ...;
+ *   };
+ *
+ * To customize:
+ *
+ *   &inertial {
+ *       decay-rate = <90>;       // slower decay = longer coast
+ *       min-velocity = <30>;     // lower = coasts longer
+ *       tick-ms = <8>;           // smoother updates
+ *       lift-timeout-ms = <40>;  // faster lift detection
+ *   };
+ */
+
+/ {
+    input_processors {
+        compatible = "zmk,input-processors";
+
+        inertial: inertial {
+            compatible = "zmk,input-processor-inertial";
+            #input-processor-cells = <0>;
+            track-remainders;
+
+            /*
+             * Default coasting settings:
+             * - Moderate decay for natural feel
+             * - ~60fps updates
+             * - 50ms lift detection
+             */
+            decay-rate = <85>;        // 85% velocity per tick
+            min-velocity = <50>;      // stop threshold
+            tick-ms = <16>;           // update interval
+            lift-timeout-ms = <50>;   // lift detection delay
+        };
+    };
+};

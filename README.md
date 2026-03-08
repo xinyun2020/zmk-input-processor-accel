@@ -1,17 +1,25 @@
-# ZMK Sigmoid Acceleration Input Processor
+# ZMK Input Processor Accel
 
-Steam Deck-style trackpad/mouse acceleration for ZMK keyboards.
+Apple/Steam Deck-style trackpad feel for ZMK keyboards.
+
+## The Problem
+
+[`zip_xy_scaler 5 1`](https://zmk.dev/docs/keymaps/input-processors/scaler) = always 5x. Jittery precision or sluggish swipes - pick one.
+
+## The Fix
+
+- **Slow** → ~1x (precise)
+- **Fast** → ~5x (covers screen)
+- **Smooth transition** → sigmoid curve ramps gradually, cursor speed matches your expectation
 
 ## Features
 
-- **Precision at slow speeds**: Small, careful movements remain 1:1
-- **Amplification at fast speeds**: Quick swipes cover more distance
-- **Smooth sigmoid transition**: No jarring jumps between modes
-- **Configurable curve**: Tune min/max scale, threshold, and steepness
+- **Sigmoid acceleration**: 0.7x → 5x based on velocity
+- **Inertial scrolling**: Cursor slides after finger lift
 
 ## Installation
 
-Add to your `config/west.yml`:
+Add to `config/west.yml`:
 
 ```yaml
 manifest:
@@ -26,63 +34,49 @@ manifest:
 
 ## Usage
 
-In your keymap or config dtsi:
-
 ```c
 #include <behaviors/input_processor_sigmoid_accel.dtsi>
+#include <behaviors/input_processor_inertial.dtsi>
+
+&sigmoid_accel {
+    min-scale = <70>;     // 0.7x slow
+    max-scale = <500>;    // 5.0x fast
+    threshold = <25>;
+    steepness = <25>;
+};
+
+&inertial {
+    decay-rate = <88>;
+    min-velocity = <40>;
+    tick-ms = <12>;
+    lift-timeout-ms = <35>;
+};
 
 &glidepoint_listener {
     input-processors =
-        <&sigmoid_accel>   // Add acceleration first
-        , <&zip_xy_transform ...>
-        , <&zip_xy_scaler 3 1>;  // Can reduce scaler since accel handles fast movements
+        <&sigmoid_accel>
+        , <&inertial>
+        , <&zip_xy_transform (...)>
+        , <&zip_xy_scaler 2 1>;
 };
 ```
 
-## Configuration
-
-Override defaults to customize the curve:
-
-```c
-&sigmoid_accel {
-    min-scale = <100>;    // 1.0x at slow speeds (100 = 1.0)
-    max-scale = <400>;    // 4.0x at fast speeds (400 = 4.0)
-    threshold = <30>;     // Lower = acceleration kicks in earlier
-    steepness = <20>;     // Higher = sharper transition
-};
-```
-
-### Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `min-scale` | 100 | Scale factor at slow speeds (÷100, so 100=1.0x) |
-| `max-scale` | 300 | Scale factor at fast speeds (÷100, so 300=3.0x) |
-| `threshold` | 50 | Velocity where curve is centered |
-| `steepness` | 10 | How sharp the transition is (÷100, so 10=0.1) |
-
-### Curve Visualization
+## How It Feels
 
 ```
-Scale
+Scale                               Fixed: ════════════════════ (always 5x)
   ^
-4x|                    ___________
+5x|                    ___________ ← fast swipes
   |                 __/
-3x|              __/
+4x|              __/
   |           __/
-2x|        __/
+3x|        __/    ← sigmoid curve
   |     __/
-1x|____/
+2x|  __/
+  |_/
+1x|← precision
   +--------------------------------> Velocity
-       ^threshold
 ```
-
-## How It Works
-
-1. Measures instantaneous velocity from input deltas and time
-2. Applies sigmoid function: `scale = min + (max-min) * sigmoid((velocity-threshold) * steepness)`
-3. Scales the input value by the calculated factor
-4. Tracks remainder for sub-pixel precision
 
 ## License
 
